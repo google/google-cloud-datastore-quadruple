@@ -53,8 +53,7 @@ dnl  limitations under the License.
   uint64_constant(EXPONENT_OF_INFINITY, 0xFFFF_FFFF)
 
   # An array of positive powers of two, each value consists of 4 longs: decimal exponent and 3 x 64
-  # bits of mantissa, divided by ten Used to find an arbitrary power of 2 (by powerOfTwo(long exp)
-  # )
+  # bits of mantissa, divided by ten Used to find an arbitrary power of 2 (by powerOfTwo(long exp))
   uint64_array_array_constant(POS_POWERS_OF_2,
     # 0: 2^0 =   1 = 0.1e1
     cst_array(1, cst_uint64(0x1999_9999_9999_9999), cst_uint64(0x9999_9999_9999_9999), cst_uint64(0x9999_9999_9999_999a)),
@@ -173,8 +172,7 @@ dnl  limitations under the License.
     cst_array(646456994, cst_uint64(0x2d18_e844_84d9_1f78), cst_uint64(0x4079_bfe7_829d_ec6f), cst_uint64(0x2155_1643_e365_abc6)))
 
   # An array of negative powers of two, each value consists of 4 longs: decimal exponent and 3 x 64
-  # bits of mantissa, divided by ten. Used to find an arbitrary power of 2 (by powerOfTwo(long exp)
-  # )
+  # bits of mantissa, divided by ten. Used to find an arbitrary power of 2 (by powerOfTwo(long exp))
   uint64_array_array_constant(NEG_POWERS_OF_2,
     # v18
     # 0: 2^0 =   1 = 0.1e1
@@ -492,10 +490,8 @@ dnl  limitations under the License.
       exp = -exp;
       powers = cst(NEG_POWERS_OF_2); # positive powers of 2 (2^0, 2^-1, 2^-2, 2^-4, 2^-8 ... 2^30)
     c_end
-    # say("powerOfTwo: exp = %s (%s)", exp, hexStr((int)exp));
 
-    # 2^31 = 0x8000_0000L; a single bit that will be shifted right at every
-    # iteration
+    # 2^31 = 0x8000_0000L; a single bit that will be shifted right at every iteration
     int64_decl(currPowOf2) = cst(POW_2_31_L);
     int32_decl(idx) = array_len(powers) - 1; # Index in the table of powers
     uint64_array_decl(power) = null;
@@ -539,7 +535,7 @@ dnl  limitations under the License.
 
   # Multiplies mantissas of two packed quasidecimal values (each is an array of 4 longs, exponent +
   # 3 x 64 bits of mantissa) Returns the product as unpacked buffer of 12 x 32 (12 x 32 bits of
-  # product)<br>
+  # product)
   # uses arrays <b><i>buffer6x32A, buffer6x32B, buffer12x32</b></i>
   # @param factor1 an array of longs containing factor 1 as packed quasidecimal
   # @param factor2 an array of longs containing factor 2 as packed quasidecimal
