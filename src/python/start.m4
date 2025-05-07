@@ -26,7 +26,6 @@ define(ret_void, {})dnl
 define(ret_bool, {})dnl
 define(ret_int32, {})dnl
 define(ret_int64, {})dnl
-define(ret_uint64_array, {})dnl
 define(ret_double, {})dnl
 define(bool_decl, $1)dnl
 define(digit_decl, $1)dnl
@@ -35,7 +34,6 @@ define(int32_decl, $1)dnl
 define(int64_decl, $1)dnl
 define(uint64_decl, $1)dnl
 define(uint64_array_decl, $1)dnl
-define(uint64_array_ldecl, $1)dnl
 define(uint64_array_array_decl, $1)dnl
 define(double_decl, $1)dnl
 

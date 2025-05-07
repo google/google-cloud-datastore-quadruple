@@ -17,7 +17,6 @@ define(ret_void, `void')dnl
 define(ret_bool, `boolean')dnl
 define(ret_int32, `int')dnl
 define(ret_int64, `long')dnl
-define(ret_uint64_array, `long[]')dnl
 define(ret_double, `double')dnl
 define(bool_decl, `boolean $1')dnl
 define(digit_decl, `byte $1')dnl
@@ -26,7 +25,6 @@ define(int32_decl, `int $1')dnl
 define(int64_decl, `long $1')dnl
 define(uint64_decl, `long $1')dnl
 define(uint64_array_decl, `long[] $1')dnl
-define(uint64_array_ldecl, `long[] $1')dnl
 define(uint64_array_array_decl, `long[][] $1')dnl
 define(double_decl, `double $1')dnl
 

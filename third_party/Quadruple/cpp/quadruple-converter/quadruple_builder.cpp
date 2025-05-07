@@ -279,9 +279,10 @@ namespace util {
     this->mantLo = 0;
 
     // Finds numeric value of the decimal mantissa
-    int32_t exp10Corr = parseMantissa(digits, this->buffer6x32C);
+    std::array<uint64_t, 6>& mantissa = this->buffer6x32C;
+    int32_t exp10Corr = parseMantissa(digits, mantissa);
 
-    if (exp10Corr == 0 && isEmpty(this->buffer6x32C)) {
+    if (exp10Corr == 0 && isEmpty(mantissa)) {
       // Mantissa == 0
       return;
     }
@@ -298,12 +299,12 @@ namespace util {
       return;
     }
 
-    int64_t exp2 = findBinaryExponent(exp10, this->buffer6x32C);
+    int64_t exp2 = findBinaryExponent(exp10, mantissa);
     // Finds binary mantissa and possible exponent correction. Fills the fields.
-    findBinaryMantissa(exp10, exp2, this->buffer6x32C);
+    findBinaryMantissa(exp10, exp2, mantissa);
   }
 
-  template<std::size_t N> int32_t QuadrupleBuilder::parseMantissa(std::vector<uint8_t>& digits,std::array<uint64_t,N>& mantissa) {
+  int32_t QuadrupleBuilder::parseMantissa(std::vector<uint8_t>& digits,std::array<uint64_t,6>& mantissa) {
     for (int i = (0); i < (6); i++) {
       mantissa[i] = 0;
     }
@@ -389,7 +390,7 @@ namespace util {
   // @param exp10 decimal exponent
   // @param mantissa array of longs containing decimal mantissa (divided by 10)
   // @return found value of binary exponent
-  template<std::size_t N> int64_t QuadrupleBuilder::findBinaryExponent(int64_t exp10,std::array<uint64_t,N>& mantissa) {
+  int64_t QuadrupleBuilder::findBinaryExponent(int64_t exp10,std::array<uint64_t,6>& mantissa) {
     uint64_t mant10 = mantissa[0] << 31 | ((mantissa[1]) >> (1)); // Higher 63 bits of the mantissa, in range
     // 0x0CC..CCC -- 0x7FF..FFF (2^63/10 -- 2^63-1)
     // decimal value of the mantissa in range 1.0..9.9999...
@@ -405,11 +406,12 @@ namespace util {
     return LOG2_E * log(x);
   }
 
-  template<std::size_t N> void QuadrupleBuilder::findBinaryMantissa(int64_t exp10,int64_t exp2,std::array<uint64_t,N>& mantissa) {
+  void QuadrupleBuilder::findBinaryMantissa(int64_t exp10,int64_t exp2,std::array<uint64_t,6>& mantissa) {
      // pow(2, -exp2): division by 2^exp2 is multiplication by 2^(-exp2) actually
-    std::array<uint64_t, 4> powerOf2 = powerOfTwo(-exp2);
+    std::array<uint64_t, 4>& powerOf2 = this->buffer4x64B;
+    powerOfTwo(-exp2, powerOf2);
     std::array<uint64_t, 12>& product = this->buffer12x32; // use it for the product (M * 10^E / 2^e)
-    product = multUnpacked6x32byPacked(mantissa, powerOf2, product); // product in buff_12x32
+    multUnpacked6x32byPacked(mantissa, powerOf2, product); // product in buff_12x32
     multBuffBy10(product); // "Quasidecimals" are numbers divided by 10
 
     // The powerOf2[0] is stored as an unsigned value
@@ -444,10 +446,11 @@ namespace util {
   // <pre>{@code {1, 0xCCCC_.._CCCCL, 0xCCCC_.._CCCCL, 0xCCCC_.._CCCDL}}}</pre>
   // uses arrays <b><i>buffer4x64B</b>, buffer6x32A, buffer6x32B, buffer12x32</i></b>,
   // @param exp the power to raise 2 to
-  // @return the value of {@code2^exp}
-  std::array<uint64_t, 4> QuadrupleBuilder::powerOfTwo(int64_t exp) {
+  // @param power (result) the value of {@code2^exp}
+  void QuadrupleBuilder::powerOfTwo(int64_t exp,std::array<uint64_t,4>& power) {
     if (exp == 0) {
-      return POS_POWERS_OF_2[0];
+      array_copy(POS_POWERS_OF_2[0], power);
+      return;
     }
 
     // positive powers of 2 (2^0, 2^1, 2^2, 2^4, 2^8 ... 2^(2^31) )
@@ -460,7 +463,6 @@ namespace util {
     // 2^31 = 0x8000_0000L; a single bit that will be shifted right at every iteration
     int64_t currPowOf2 = POW_2_31_L;
     int32_t idx = 32; // Index in the table of powers
-    std::array<uint64_t, 4>& power = (*(powers))[idx]; // Placeholder value, will be overwritten.
     bool first_power = true;
 
     // if exp = b31 * 2^31 + b30 * 2^30 + .. + b0 * 2^0, where b0..b31 are the values of the bits in
@@ -469,19 +471,24 @@ namespace util {
       if (exp >= currPowOf2) { // the current bit in the exponent is 1
         if (first_power) {
            // 4 longs, power[0] -- decimal (?) exponent, power[1..3] -- 192 bits of mantissa
-          power = (*(powers))[idx];
+          array_copy((*(powers))[idx], power);
           first_power = false;
         } else {
           // Multiply by the corresponding power of 2
-          power = multPacked3x64_AndAdjustExponent(power, (*(powers))[idx]);
+          multPacked3x64_AndAdjustExponent(power, (*(powers))[idx], power);
         }
         exp -= currPowOf2;
       }
       idx -= 1;
       currPowOf2 = ((currPowOf2) >> (1));
     }
+  }
 
-    return power;
+  // Copies from into to.
+  template<std::size_t N> void QuadrupleBuilder::array_copy(std::array<uint64_t,N>& source,std::array<uint64_t,4>& dest) {
+    for (int i = (0); i < ((dest).size()); i++) {
+      dest[i] = source[i];
+    }
   }
 
   // Multiplies two quasidecimal numbers contained in buffers of 3 x 64 bits with exponents, puts
@@ -490,27 +497,25 @@ namespace util {
   // bits of mantissa. If the higher word of mantissa of the product is less than
   // 0x1999_9999_9999_9999L (i.e. mantissa is less than 0.1) multiplies mantissa by 10 and adjusts
   // the exponent respectively.
-  template<std::size_t N1, std::size_t N2> std::array<uint64_t, 4> QuadrupleBuilder::multPacked3x64_AndAdjustExponent(std::array<uint64_t,N1>& factor1,std::array<uint64_t,N2>& factor2) {
-    multPacked3x64_simply(factor1, factor2);
+  void QuadrupleBuilder::multPacked3x64_AndAdjustExponent(std::array<uint64_t,4>& factor1,std::array<uint64_t,4>& factor2,std::array<uint64_t,4>& result) {
+    multPacked3x64_simply(factor1, factor2, this->buffer12x32);
     int32_t expCorr = correctPossibleUnderflow(this->buffer12x32);
-    std::array<uint64_t, 4>& result = this->buffer4x64B;
     pack_6x32_to_3x64(this->buffer12x32, result);
 
     // result[0] is a signed int64 value stored in an uint64
     result[0] = factor1[0] + factor2[0] + (static_cast<uint64_t>(expCorr)); // product.exp = f1.exp + f2.exp
-    return result;
   }
 
   // Multiplies mantissas of two packed quasidecimal values (each is an array of 4 longs, exponent +
   // 3 x 64 bits of mantissa) Returns the product as unpacked buffer of 12 x 32 (12 x 32 bits of
   // product)
-  // uses arrays <b><i>buffer6x32A, buffer6x32B, buffer12x32</b></i>
+  // uses arrays <b><i>buffer6x32A, buffer6x32B</b></i>
   // @param factor1 an array of longs containing factor 1 as packed quasidecimal
   // @param factor2 an array of longs containing factor 2 as packed quasidecimal
-  // @return BUFF_12x32 filled with the product of mantissas
-  template<std::size_t N1, std::size_t N2> std::array<uint64_t, 12> QuadrupleBuilder::multPacked3x64_simply(std::array<uint64_t,N1>& factor1,std::array<uint64_t,N2>& factor2) {
-    for (int i = (0); i < ((this->buffer12x32).size()); i++) {
-      this->buffer12x32[i] = 0;
+  // @param result an array of 12 longs filled with the product of mantissas
+  void QuadrupleBuilder::multPacked3x64_simply(std::array<uint64_t,4>& factor1,std::array<uint64_t,4>& factor2,std::array<uint64_t,12>& result) {
+    for (int i = (0); i < ((result).size()); i++) {
+      result[i] = 0;
     }
     // TODO2 19.01.16 21:23:06 for the next version -- rebuild the table of powers to make the
     // numbers unpacked, to avoid packing/unpacking
@@ -520,28 +525,27 @@ namespace util {
     for (int i = (6) - 1; i >= (0); i--) { // compute partial 32-bit products
       for (int j = (6) - 1; j >= (0); j--) {
         uint64_t part = this->buffer6x32A[i] * this->buffer6x32B[j];
-        this->buffer12x32[j + i + 1] = (this->buffer12x32[j + i + 1] + (part & LOWER_32_BITS));
-        this->buffer12x32[j + i] = (this->buffer12x32[j + i] + ((part) >> (32)));
+        result[j + i + 1] = (result[j + i + 1] + (part & LOWER_32_BITS));
+        result[j + i] = (result[j + i] + ((part) >> (32)));
       }
     }
 
     // Carry higher bits of the product to the lower bits of the next word
     for (int i = (12) - 1; i >= (1); i--) {
-      this->buffer12x32[i - 1] = (this->buffer12x32[i - 1] + ((this->buffer12x32[i]) >> (32)));
-      this->buffer12x32[i] &= LOWER_32_BITS;
+      result[i - 1] = (result[i - 1] + ((result[i]) >> (32)));
+      result[i] &= LOWER_32_BITS;
     }
-    return this->buffer12x32;
   }
 
-  // Corrects possible underflow of the decimal mantissa, passed in in the {@code buffer_10x32}, by
+  // Corrects possible underflow of the decimal mantissa, passed in in the {@code mantissa}, by
   // multiplying it by a power of ten. The corresponding value to adjust the decimal exponent is
   // returned as the result
-  // @param buffer_10x32 a buffer containing the mantissa to be corrected
+  // @param mantissa a buffer containing the mantissa to be corrected
   // @return a corrective (addition) that is needed to adjust the decimal exponent of the number
-  template<std::size_t N> int32_t QuadrupleBuilder::correctPossibleUnderflow(std::array<uint64_t,N>& buffer_10x32) {
+  template<std::size_t N> int32_t QuadrupleBuilder::correctPossibleUnderflow(std::array<uint64_t,N>& mantissa) {
     int32_t expCorr = 0;
-    while (isLessThanOne(buffer_10x32)) { // Underflow
-      multBuffBy10(buffer_10x32);
+    while (isLessThanOne(mantissa)) { // Underflow
+      multBuffBy10(mantissa);
       expCorr -= 1;
     }
     return expCorr;
@@ -581,9 +585,7 @@ namespace util {
   // @param factor1 a buffer containing unpacked quasidecimal mantissa (6 x 32 bits)
   // @param factor2 an array of 4 longs containing packed quasidecimal power of two
   // @param product a buffer of at least 12 longs to hold the product
-  // @return an unpacked (with 32 bits used only) value of 384 bits of the product put in the {@code
-  //     product}
-  template<std::size_t N1, std::size_t N2, std::size_t P> std::array<uint64_t, P> QuadrupleBuilder::multUnpacked6x32byPacked(std::array<uint64_t,N1>& factor1,std::array<uint64_t,N2>& factor2,std::array<uint64_t,P>& product) {
+  void QuadrupleBuilder::multUnpacked6x32byPacked(std::array<uint64_t,6>& factor1,std::array<uint64_t,4>& factor2,std::array<uint64_t,12>& product) {
     for (int i = (0); i < ((product).size()); i++) {
       product[i] = 0;
     }
@@ -605,8 +607,6 @@ namespace util {
       product[i - 1] = (product[i - 1] + ((product[i]) >> (32)));
       product[i] &= LOWER_32_BITS;
     }
-
-    return product;
   }
 
   // Multiplies the unpacked value stored in the given buffer by 10
@@ -686,7 +686,7 @@ namespace util {
   // of the mantissa
   // @param qd192 array of 4 longs containing the number to unpack
   // @param buff_6x32 buffer of 6 long to hold the unpacked mantissa
-  template<std::size_t N, std::size_t P> void QuadrupleBuilder::unpack_3x64_to_6x32(std::array<uint64_t,N>& qd192,std::array<uint64_t,P>& buff_6x32) {
+  void QuadrupleBuilder::unpack_3x64_to_6x32(std::array<uint64_t,4>& qd192,std::array<uint64_t,6>& buff_6x32) {
     buff_6x32[0] = ((qd192[1]) >> (32));
     buff_6x32[1] = qd192[1] & LOWER_32_BITS;
     buff_6x32[2] = ((qd192[2]) >> (32));

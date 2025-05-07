@@ -18,7 +18,6 @@ define(ret_void, `void')dnl
 define(ret_bool, `bool')dnl
 define(ret_int32, `int32_t')dnl
 define(ret_int64, `int64_t')dnl
-define(ret_uint64_array, `std::array<uint64_t`,' `$1'>')dnl
 define(ret_double, `double')dnl
 define(bool_decl, `bool $1')dnl
 define(digit_decl, `uint8_t $1')dnl
@@ -27,7 +26,6 @@ define(int32_decl, `int32_t $1')dnl
 define(int64_decl, `int64_t $1')dnl
 define(uint64_decl, `uint64_t $1')dnl
 define(uint64_array_decl, `std::array<uint64_t, $2>& $1')dnl
-define(uint64_array_ldecl, `std::array<uint64_t, $2> $1')dnl
 define(uint64_array_array_decl, `std::array<std::array<uint64_t, 4>, 33>* $1')dnl
 define(double_decl, `double $1')dnl
 

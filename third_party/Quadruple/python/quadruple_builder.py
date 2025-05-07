@@ -287,9 +287,10 @@ class QuadrupleBuilder(object):
     self.mantLo = 0;
 
     # Finds numeric value of the decimal mantissa
-    exp10Corr = self.parseMantissa(digits, self.buffer6x32C);
+    mantissa = self.buffer6x32C;
+    exp10Corr = self.parseMantissa(digits, mantissa);
 
-    if exp10Corr == 0 and self.isEmpty(self.buffer6x32C):
+    if exp10Corr == 0 and self.isEmpty(mantissa):
       # Mantissa == 0
       return;
     
@@ -306,9 +307,9 @@ class QuadrupleBuilder(object):
       return;
     
 
-    exp2 = self.findBinaryExponent(exp10, self.buffer6x32C);
+    exp2 = self.findBinaryExponent(exp10, mantissa);
     # Finds binary mantissa and possible exponent correction. Fills the fields.
-    self.findBinaryMantissa(exp10, exp2, self.buffer6x32C);
+    self.findBinaryMantissa(exp10, exp2, mantissa);
   
 
   def parseMantissa(self, digits,mantissa):
@@ -415,9 +416,10 @@ class QuadrupleBuilder(object):
 
   def findBinaryMantissa(self, exp10,exp2,mantissa):
      # pow(2, -exp2): division by 2^exp2 is multiplication by 2^(-exp2) actually
-    powerOf2 = self.powerOfTwo(-exp2);
+    powerOf2 = self.buffer4x64B;
+    self.powerOfTwo(-exp2, powerOf2);
     product = self.buffer12x32; # use it for the product (M * 10^E / 2^e)
-    product = self.multUnpacked6x32byPacked(mantissa, powerOf2, product); # product in buff_12x32
+    self.multUnpacked6x32byPacked(mantissa, powerOf2, product); # product in buff_12x32
     self.multBuffBy10(product); # "Quasidecimals" are numbers divided by 10
 
     # The powerOf2[0] is stored as an unsigned value
@@ -452,10 +454,11 @@ class QuadrupleBuilder(object):
   # <pre>{@code {1, 0xCCCC_.._CCCCL, 0xCCCC_.._CCCCL, 0xCCCC_.._CCCDL}}}</pre>
   # uses arrays <b><i>buffer4x64B</b>, buffer6x32A, buffer6x32B, buffer12x32</i></b>,
   # @param exp the power to raise 2 to
-  # @return the value of {@code2^exp}
-  def powerOfTwo(self, exp):
+  # @param power (result) the value of {@code2^exp}
+  def powerOfTwo(self, exp,power):
     if exp == 0:
-      return self.POS_POWERS_OF_2[0];
+      self.array_copy(self.POS_POWERS_OF_2[0], power);
+      return;
     
 
     # positive powers of 2 (2^0, 2^1, 2^2, 2^4, 2^8 ... 2^(2^31) )
@@ -468,7 +471,6 @@ class QuadrupleBuilder(object):
     # 2^31 = 0x8000_0000L; a single bit that will be shifted right at every iteration
     currPowOf2 = self.POW_2_31_L;
     idx = 32; # Index in the table of powers
-    power = (powers)[idx]; # Placeholder value, will be overwritten.
     first_power = True;
 
     # if exp = b31 * 2^31 + b30 * 2^30 + .. + b0 * 2^0, where b0..b31 are the values of the bits in
@@ -477,19 +479,24 @@ class QuadrupleBuilder(object):
       if exp >= currPowOf2: # the current bit in the exponent is 1
         if first_power:
            # 4 longs, power[0] -- decimal (?) exponent, power[1..3] -- 192 bits of mantissa
-          power = (powers)[idx];
+          self.array_copy((powers)[idx], power);
           first_power = False;
         else:
           # Multiply by the corresponding power of 2
-          power = self.multPacked3x64_AndAdjustExponent(power, (powers)[idx]);
+          self.multPacked3x64_AndAdjustExponent(power, (powers)[idx], power);
         
         exp -= currPowOf2;
       
       idx -= 1;
       currPowOf2 = ((currPowOf2) >> (1));
     
+  
 
-    return power;
+  # Copies from into to.
+  def array_copy(self, source,dest):
+    for i in range(0, len((dest))):
+      dest[i] = source[i];
+    
   
 
   # Multiplies two quasidecimal numbers contained in buffers of 3 x 64 bits with exponents, puts
@@ -498,27 +505,25 @@ class QuadrupleBuilder(object):
   # bits of mantissa. If the higher word of mantissa of the product is less than
   # 0x1999_9999_9999_9999L (i.e. mantissa is less than 0.1) multiplies mantissa by 10 and adjusts
   # the exponent respectively.
-  def multPacked3x64_AndAdjustExponent(self, factor1,factor2):
-    self.multPacked3x64_simply(factor1, factor2);
+  def multPacked3x64_AndAdjustExponent(self, factor1,factor2,result):
+    self.multPacked3x64_simply(factor1, factor2, self.buffer12x32);
     expCorr = self.correctPossibleUnderflow(self.buffer12x32);
-    result = self.buffer4x64B;
     self.pack_6x32_to_3x64(self.buffer12x32, result);
 
     # result[0] is a signed int64 value stored in an uint64
     result[0] = factor1[0] + factor2[0] + (expCorr); # product.exp = f1.exp + f2.exp
-    return result;
   
 
   # Multiplies mantissas of two packed quasidecimal values (each is an array of 4 longs, exponent +
   # 3 x 64 bits of mantissa) Returns the product as unpacked buffer of 12 x 32 (12 x 32 bits of
   # product)
-  # uses arrays <b><i>buffer6x32A, buffer6x32B, buffer12x32</b></i>
+  # uses arrays <b><i>buffer6x32A, buffer6x32B</b></i>
   # @param factor1 an array of longs containing factor 1 as packed quasidecimal
   # @param factor2 an array of longs containing factor 2 as packed quasidecimal
-  # @return BUFF_12x32 filled with the product of mantissas
-  def multPacked3x64_simply(self, factor1,factor2):
-    for i in range(0, len((self.buffer12x32))):
-      self.buffer12x32[i] = 0;
+  # @param result an array of 12 longs filled with the product of mantissas
+  def multPacked3x64_simply(self, factor1,factor2,result):
+    for i in range(0, len((result))):
+      result[i] = 0;
     
     # TODO2 19.01.16 21:23:06 for the next version -- rebuild the table of powers to make the
     # numbers unpacked, to avoid packing/unpacking
@@ -528,28 +533,27 @@ class QuadrupleBuilder(object):
     for i in range((6) - 1, (0) - 1, -1): # compute partial 32-bit products
       for j in range((6) - 1, (0) - 1, -1):
         part = self.buffer6x32A[i] * self.buffer6x32B[j];
-        self.buffer12x32[j + i + 1] = ((self.buffer12x32[j + i + 1] + (part & self.LOWER_32_BITS)) & 0xffffffffffffffff);
-        self.buffer12x32[j + i] = ((self.buffer12x32[j + i] + ((part) >> (32))) & 0xffffffffffffffff);
+        result[j + i + 1] = ((result[j + i + 1] + (part & self.LOWER_32_BITS)) & 0xffffffffffffffff);
+        result[j + i] = ((result[j + i] + ((part) >> (32))) & 0xffffffffffffffff);
       
     
 
     # Carry higher bits of the product to the lower bits of the next word
     for i in range((12) - 1, (1) - 1, -1):
-      self.buffer12x32[i - 1] = ((self.buffer12x32[i - 1] + ((self.buffer12x32[i]) >> (32))) & 0xffffffffffffffff);
-      self.buffer12x32[i] &= self.LOWER_32_BITS;
+      result[i - 1] = ((result[i - 1] + ((result[i]) >> (32))) & 0xffffffffffffffff);
+      result[i] &= self.LOWER_32_BITS;
     
-    return self.buffer12x32;
   
 
-  # Corrects possible underflow of the decimal mantissa, passed in in the {@code buffer_10x32}, by
+  # Corrects possible underflow of the decimal mantissa, passed in in the {@code mantissa}, by
   # multiplying it by a power of ten. The corresponding value to adjust the decimal exponent is
   # returned as the result
-  # @param buffer_10x32 a buffer containing the mantissa to be corrected
+  # @param mantissa a buffer containing the mantissa to be corrected
   # @return a corrective (addition) that is needed to adjust the decimal exponent of the number
-  def correctPossibleUnderflow(self, buffer_10x32):
+  def correctPossibleUnderflow(self, mantissa):
     expCorr = 0;
-    while self.isLessThanOne(buffer_10x32): # Underflow
-      self.multBuffBy10(buffer_10x32);
+    while self.isLessThanOne(mantissa): # Underflow
+      self.multBuffBy10(mantissa);
       expCorr -= 1;
     
     return expCorr;
@@ -589,8 +593,6 @@ class QuadrupleBuilder(object):
   # @param factor1 a buffer containing unpacked quasidecimal mantissa (6 x 32 bits)
   # @param factor2 an array of 4 longs containing packed quasidecimal power of two
   # @param product a buffer of at least 12 longs to hold the product
-  # @return an unpacked (with 32 bits used only) value of 384 bits of the product put in the {@code
-  #     product}
   def multUnpacked6x32byPacked(self, factor1,factor2,product):
     for i in range(0, len((product))):
       product[i] = 0;
@@ -613,8 +615,6 @@ class QuadrupleBuilder(object):
       product[i - 1] = ((product[i - 1] + ((product[i]) >> (32))) & 0xffffffffffffffff);
       product[i] &= self.LOWER_32_BITS;
     
-
-    return product;
   
 
   # Multiplies the unpacked value stored in the given buffer by 10
