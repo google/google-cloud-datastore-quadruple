@@ -4,7 +4,7 @@ The conversion source code is in `QuadrupleBuilder.m4`, written in a
 pseudo-language defined via set of
 [m4](https://en.wikipedia.org/wiki/M4_(computer_language)) macros.
 
-For each supported language -- currently Java and Python -- a set of macro
+For each supported language -- currently Java, Python and C++ -- a set of macro
 definitions is provided to convert the constructs used in `QuadrupleBuilder.m4`
 to an appropriate construct in the target language. A `Makefile` rule takes
 these macro definitions and `QuadrupleBuilder.m4` and generates the actual
@@ -25,14 +25,17 @@ and the new language defining it in some appropriate fashion.
 
 ## Input and Output
 
-The input to conversion is the sign, decimal digits and decimal exponent of the
+The input to conversion is the decimal digits and decimal exponent of the
 decimal floating-point number.
 
-The output is the sign, 128-bit binary floating point (normalized, with leading
+The output is the 128-bit binary floating point (normalized, with leading
 1 omitted) mantissa and 32-bit binary exponent -- the format of
 https://github.com/m-vokhm/Quadruple
 
-Subnormals are not supported - converting such a number will return 0 or -0.
+Subnormals are not supported - converting such a number will return 0.
+
+The conversion does not handle the input's sign as it has no impact on the
+conversion of the decimal digits and exponent to the mantissa and exponent.
 
 ## Overall Structure
 
@@ -69,6 +72,8 @@ The conversion code works with
 - unsigned 32 and 64-bit integers
 - IEEE 64-bit binary floating point numbers
 - arrays of unsigned 64-bit integers
+
+Arrays are passed by reference, the other types by value.
 
 +, - and * are assumed to work on the numeric types, and << on the integer
 types. No wrapping is assumed, the only requirement is that the low-order
@@ -109,26 +114,24 @@ All declarations happen at the top-level of `QuadrupleBuilder.m4`.
   `name` with value `value`
 - `double_constant(name, value)` - define a 64-bit floating point constant called
   `name` with value `value`
-- `uint64_array_constant(name, array1, array2, ...)` - define an array of
+- `uint64_array_array_constant(name, array1, array2, ...)` - define an array of
   4-element arrays containing 64-bit unsigned integers called `name`, with
   4-element arrays `array1`, `array2`, ...
 - `cst_array(C1, C2, C3, C4)` - a 4-element constant array of 64-bit unsigned
-  integers (used with `int64_array_constant`)
+  integers (used with `uint64_array_array_constant`)
   
   the code cheats and places a signed number in C1, and uses `wrap_uint64` where
   necessary to compare signed values with this array element
 
 ### Assumed Fields
 
-The following fields are assumed to exist: `negative`, `exponent`, `mantHi`, `mantLo`.
+The following fields are assumed to exist: `exponent`, `mantHi`, `mantLo`.
 
 ### Fields Containing Pre-Allocated Arrays
 
 - `def_init()` - introduces the declarations of the pre-allocated arrays
-- `int64_array(name, size)` - pre-allocate an array called `name` that holds `size` 64-bit
+- `uint64_array(name, size)` - pre-allocate an array called `name` that holds `size` 64-bit
   integers (initial contents undefined)
-- `digit_array(name, size)` - pre-allocate an array called `name` that holds `size` decimal
-  digits (initial contents undefined)
   
 ### Argument and Local Variable Declarations
 
@@ -138,10 +141,11 @@ The following fields are assumed to exist: `negative`, `exponent`, `mantHi`, `ma
 - `int64_decl(name)` - declare a signed 64-bit integer
 - `uint64_decl(name)` - declare an unsigned 64-bit integer
 - `double_decl(name)` - declare an IEEE 64-bit floating point number
-- `uint64_array_decl(name)` - declare a reference to an array of unsigned 64-bit
-  integers - this can reference an element of `uint64_array_constant` or a
-  pre-allocated `uint64_array`
-- `uint64_array_array_decl(name)` - declare a reference to an `uint64_array_constant`
+- `uint64_array_decl(name, size)` - declare a reference to an array of `size` unsigned 64-bit
+  integers
+- `uint64_array_array_decl(name)` - declare a reference to an `uint64_array_array_constant` (also see `ref`)
+- `new_digit_array(name, size)` - declare and allocate an array called `name` that holds `size` decimal
+  digits (initial contents undefined)
 
 Local variable declarations must be followed by an initializer (`= expression`)
   
@@ -153,13 +157,15 @@ Local variable declarations must be followed by an initializer (`= expression`)
 
   the body of the function must be indented within `def_fn` and must be
   terminated with `c_end`
+- `def_array_fn(array_size(N1, ...), return_type, name, arg1, arg2, ...)` - like
+  `def_fn`, but the declarations of `arg1`, ... can use `N1`, ... in their
+  `uint64_array_decl` types; the resulting function is generic over the size of
+  the corresponding arrays
 - `ret_void` - a function with no result
 - `ret_bool` - a function that returns a boolean
 - `ret_int32` - a function that returns a signed 32-bit integer
 - `ret_int64` - a function that returns a signed 64-bit integer
 - `ret_double` - a function that returns an IEEE 64-bit floating point number
-- `ret_uint64_array` - a function that returns a reference to an array of
-  unsigned 64-bit integers
 
 ### Control Structures
 
@@ -183,9 +189,11 @@ function definitions) end with `c_end`.
 Decimal and hexadecimal constants are allowed - hexadecimal constants use the 0x prefix.
 
 - `cst(name)` - reference constant `name`
-- `cst_int64(C)` - a 64-bit unsigned constant - may contain embedded underscores
+- `cst_uint64(C)` - a 64-bit unsigned constant - may contain embedded underscores
   for readability
 - `field(name)` - reference one of the assumed fields or pre-allocated arrays
+- `ref(name)` - make a reference to a `uint64_array_array_constant`
+- `deref(name)` - use a reference declared with `uint64_array_array_decl`
 - `fn(name)(e1, e2, ...)` - invoke function `name` with arguments `e1`, `e2`, ...
 
 ### Required Functions
