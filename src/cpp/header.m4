@@ -22,12 +22,9 @@ $ifndef CLOUD_DATASTORE_UTIL_QUADRUPLE_BUILDER
 $define CLOUD_DATASTORE_UTIL_QUADRUPLE_BUILDER
 
 $include <array>
-$include <bit>
 $include <cstddef>
 $include <cstdint>
-$include <string>
 $include <vector>
-$include <math.h>
 
 namespace cloud_datastore {
 

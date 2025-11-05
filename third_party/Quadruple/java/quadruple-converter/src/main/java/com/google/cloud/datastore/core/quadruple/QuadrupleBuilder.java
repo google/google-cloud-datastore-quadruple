@@ -60,10 +60,10 @@ public class QuadrupleBuilder {
   static final long HIGHER_32_BITS = 0xFFFFFFFF00000000L;
 
   // Approximate value of log<sub>2</sub>(10)
-  static final double LOG2_10 = Math.log(10) / Math.log(2);
+  double_variable(LOG2_10, Math.log(10) / Math.log(2))
 
   // Approximate value of log<sub>2</sub>(e)
-  static final double LOG2_E = 1 / Math.log(2.0);
+  double_variable(LOG2_E, 1 / Math.log(2.0))
 
   // The value of the exponent (biased) corresponding to {@code 1.0 == 2^0}; equals to 2_147_483_647
   // ({@code 0x7FFF_FFFF}).

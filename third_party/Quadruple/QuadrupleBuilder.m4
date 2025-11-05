@@ -39,10 +39,10 @@ dnl  limitations under the License.
   uint64_constant(HIGHER_32_BITS, 0xFFFF_FFFF_0000_0000)
 
   # Approximate value of log<sub>2</sub>(10)
-  double_constant(LOG2_10, f_log(10) / f_log(2))
+  double_variable(LOG2_10, f_log(10) / f_log(2))
 
   # Approximate value of log<sub>2</sub>(e)
-  double_constant(LOG2_E, 1 / f_log(2.0))
+  double_variable(LOG2_E, 1 / f_log(2.0))
 
   # The value of the exponent (biased) corresponding to {@code 1.0 == 2^0}; equals to 2_147_483_647
   # ({@code 0x7FFF_FFFF}).
