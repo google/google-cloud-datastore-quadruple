@@ -20,8 +20,8 @@
 #include <cstdint>
 #include <limits>
 #include <random>
+#include <gtest/gtest.h>
 
-#include "testing/base/public/gunit.h"
 #include "third_party/absl/random/random.h"
 
 namespace cloud_datastore {
