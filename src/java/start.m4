@@ -2,7 +2,7 @@ define(cst, `$1')dnl
 define(int32_constant, `static final int $1 = $2;')dnl
 define(uint64_constant, `static final long $1 = translit($2, _)L;')dnl
 define(double_constant, `static final double $1 = $2;')dnl
-define(double_variable, `final double $1 = $2;')dnl
+define(double_computed_constant, `static final double $1 = $2;')dnl
 define(uint64_array_array_constant, `private static final long[][] $1 = { shift($@) };')dnl
 define(cst_uint64, translit($1, _)L)dnl
 define(cst_array, { $@ })dnl

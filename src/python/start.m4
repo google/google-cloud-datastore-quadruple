@@ -5,7 +5,7 @@ define(cst, {self.$1})dnl
 define(int32_constant, {$1 = $2})dnl
 define(uint64_constant, {$1 = $2})dnl
 define(double_constant, {$1 = $2})dnl
-define(double_variable, {$1 = $2})dnl
+define(double_computed_constant, {$1 = $2})dnl
 define(uint64_array_array_constant, {$1 = ( shift($@) )})dnl
 define(cst_uint64, $1)dnl
 define(cst_array, ( $@ ))dnl
