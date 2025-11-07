@@ -21,6 +21,12 @@
 
 
 #include "quadruple_builder.h"
+#include <stdlib.h>
+#include <math.h>
+#include <array>
+#include <cstdint>
+#include <cstddef>
+#include <vector>
 
 namespace cloud_datastore {
 
@@ -50,10 +56,10 @@ namespace cloud_datastore {
   static constexpr uint64_t HIGHER_32_BITS = 0xFFFFFFFF00000000L;
 
   // Approximate value of log<sub>2</sub>(10)
-  static constexpr double LOG2_10 = log(10) / log(2);
+  static double LOG2_10 = log(10) / log(2);
 
   // Approximate value of log<sub>2</sub>(e)
-  static constexpr double LOG2_E = 1 / log(2.0);
+  static double LOG2_E = 1 / log(2.0);
 
   // The value of the exponent (biased) corresponding to {@code 1.0 == 2^0}; equals to 2_147_483_647
   // ({@code 0x7FFF_FFFF}).

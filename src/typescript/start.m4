@@ -2,6 +2,7 @@ define(cst, `QuadrupleBuilder.$1')dnl
 define(int32_constant, `static $1 = $2;')dnl
 define(uint64_constant, `static $1 = $2n;')dnl
 define(double_constant, `static $1 = $2;')dnl
+define(double_computed_constant, `static $1 = $2;')dnl
 define(uint64_array_array_constant, `static $1: bigint[][] = [ shift($@) ];')dnl
 define(cst_uint64, `$1n')dnl
 define(cst_array, `[ $1n, shift($@) ]')dnl

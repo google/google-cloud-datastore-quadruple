@@ -35,7 +35,7 @@ class Quadruple {
  public:
   // Initialises a Quadruple to +0.0
   Quadruple() : Quadruple(0, 0, 0) {}
-  
+
   Quadruple(uint64_t exponent_and_sign, uint64_t mantissa_hi,
             uint64_t mantissa_lo)
       : negative_(exponent_and_sign >> 63),
@@ -85,7 +85,6 @@ class Quadruple {
     out << std::setw(16) << mantissa_lo_;
     out << "*2^" << std::dec << exponent_ - static_cast<int64_t>(kExponentBias);
     out << " =~ " << static_cast<double>(*this);
-    
     return out.str();
   }
 
@@ -101,3 +100,4 @@ class Quadruple {
 }  // namespace cloud_datastore
 
 #endif  // CLOUD_DATASTORE_COMMON_QUADRUPLE_H_
+

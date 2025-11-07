@@ -17,10 +17,12 @@
 #include <stdint.h>
 
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <random>
-
 #include <gtest/gtest.h>
+
+#include "third_party/absl/random/random.h"
 
 namespace cloud_datastore {
 namespace {
@@ -72,8 +74,7 @@ TEST(QuadrupleTest, Zero) {
 }
 
 TEST(QuadrupleTest, RandomQuadruple) {
-  std::random_device rd;
-  std::mt19937 gen(rd());
+  absl::BitGen gen;
   std::uniform_int_distribution<uint64_t> mantissa_gen(0, (1LL << 52) - 1);
   // Avoid subnormal exponents, as it makes building identical double
   // and Quadruple values harder.
@@ -114,8 +115,7 @@ TEST(QuadrupleTest, RandomQuadruple) {
 }
 
 TEST(QuadrupleTest, RandomDouble) {
-  std::random_device rd;
-  std::mt19937 gen(rd());
+  absl::BitGen gen;
   std::uniform_real_distribution<> mantissa(0.5, 1.0);
   // Includes (double) subnormal exponents.
   std::uniform_int_distribution<> exponent(-1074, 1023);
@@ -174,8 +174,7 @@ TEST(QuadrupleTest, LargeAndSmall) {
 }
 
 TEST(QuadrupleTest, RandomLong) {
-  std::random_device rd;
-  std::mt19937 gen(rd());
+  absl::BitGen gen;
   std::uniform_int_distribution<> bitCount(0, 63);
   for (int i = 0; i < 1000; i++) {
     int bits = bitCount(gen);
@@ -276,11 +275,11 @@ TEST(Quadruple, Parse) {
   EXPECT_EQ(q.Compare(Quadruple(100.0)), 0);
 }
 
+}  // namespace
+}  // namespace cloud_datastore
 
-} // namespace
-} // namespace cloud_datastore
-
-int main(int argc, char **argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }
+

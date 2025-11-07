@@ -2,6 +2,7 @@ define(cst, `$1')dnl
 define(int32_constant, `static constexpr int32_t $1 = translit($2, _);')dnl
 define(uint64_constant, `static constexpr uint64_t $1 = translit($2, _)L;')dnl
 define(double_constant, `static constexpr double $1 = $2;')dnl
+define(double_computed_constant, `static double $1 = $2;')dnl
 define(uint64_array_array_constant, `static std::array<std::array<uint64_t, 4>, 33> $1 = {{ shift($@) }};')dnl
 define(cst_uint64, `translit($1, _)LL')dnl
 define(cst_array, ` {{ static_cast<uint64_t>($1), $2, $3, $4 }}')dnl
@@ -56,5 +57,11 @@ define(f_floor, `floor($1)')dnl
 define(f_iabs, `static_cast<int32_t>(labs($1))')dnl
 
 $include "quadruple_builder.h"
+$include <stdlib.h>
+$include <math.h>
+$include <array>
+$include <cstdint>
+$include <cstddef>
+$include <vector>
 
 namespace cloud_datastore {
