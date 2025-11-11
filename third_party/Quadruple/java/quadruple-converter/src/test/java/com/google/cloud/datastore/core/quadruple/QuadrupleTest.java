@@ -37,9 +37,9 @@ public class QuadrupleTest {
     Quadruple q1 = Quadruple.fromLong(1);
     Quadruple q2 = Quadruple.fromDouble(1.1);
 
-    assertEquals(1.0, toDouble(q1));
-    assertEquals(-1.0, toDouble(Quadruple.fromLong(-1)));
-    assertEquals(1.1, toDouble(q2));
+    assertEquals(1.0, toDouble(q1), 0.0);
+    assertEquals(-1.0, toDouble(Quadruple.fromLong(-1)), 0.0);
+    assertEquals(1.1, toDouble(q2), 0.0);
     assertLessThan(q1, q2);
   }
 
@@ -105,18 +105,18 @@ public class QuadrupleTest {
             Quadruple q2 = class2.get(index2);
             String testCase = classIndex1 + "/" + index1 + " <-> " + classIndex2 + "/" + index2;
             if (classIndex1 == classIndex2) {
-              assertEquals(q1, q2, testCase);
-              assertTrue(q1.compareTo(q2) == 0, testCase);
-              assertTrue(q2.compareTo(q1) == 0, testCase);
-              assertEquals(q1.hashCode(), q2.hashCode(), testCase);
+              assertEquals(testCase, q1, q2);
+              assertTrue(testCase, q1.compareTo(q2) == 0);
+              assertTrue(testCase, q2.compareTo(q1) == 0);
+              assertEquals(testCase, q1.hashCode(), q2.hashCode());
             } else if (classIndex1 < classIndex2) {
-              assertNotEquals(q1, q2, testCase);
-              assertTrue(q1.compareTo(q2) < 0, testCase);
-              assertTrue(q2.compareTo(q1) > 0, testCase);
+              assertNotEquals(testCase, q1, q2);
+              assertTrue(testCase, q1.compareTo(q2) < 0);
+              assertTrue(testCase, q2.compareTo(q1) > 0);
             } else {
               assertNotEquals(q1, q2);
-              assertTrue(q1.compareTo(q2) > 0, testCase);
-              assertTrue(q2.compareTo(q1) < 0, testCase);
+              assertTrue(testCase, q1.compareTo(q2) > 0);
+              assertTrue(testCase, q2.compareTo(q1) < 0);
             }
           }
         }
@@ -134,11 +134,11 @@ public class QuadrupleTest {
 
   @Test
   public void infinityAndNaN() {
-    assertEquals(toDouble(Quadruple.NEGATIVE_INFINITY), Double.NEGATIVE_INFINITY);
-    assertEquals(toDouble(Quadruple.POSITIVE_INFINITY), Double.POSITIVE_INFINITY);
+    assertEquals(toDouble(Quadruple.NEGATIVE_INFINITY), Double.NEGATIVE_INFINITY, 0.0);
+    assertEquals(toDouble(Quadruple.POSITIVE_INFINITY), Double.POSITIVE_INFINITY, 0.0);
 
-    assertEquals(toDouble(Quadruple.NaN), Double.NaN);
-    assertEquals(toDouble(OTHER_NAN), Double.NaN);
+    assertEquals(toDouble(Quadruple.NaN), Double.NaN, 0.0);
+    assertEquals(toDouble(OTHER_NAN), Double.NaN, 0.0);
 
     assertTrue(Quadruple.NaN.isNaN());
     assertTrue(OTHER_NAN.isNaN());
@@ -155,8 +155,8 @@ public class QuadrupleTest {
 
   @Test
   public void zero() {
-    assertEquals(toDouble(Quadruple.POSITIVE_ZERO), 0.0);
-    assertEquals(toDouble(Quadruple.NEGATIVE_ZERO), -0.0);
+    assertEquals(toDouble(Quadruple.POSITIVE_ZERO), 0.0, 0.0);
+    assertEquals(toDouble(Quadruple.NEGATIVE_ZERO), -0.0, 0.0);
 
     assertTrue(Quadruple.NEGATIVE_ZERO.isZero());
     assertTrue(Quadruple.POSITIVE_ZERO.isZero());
@@ -227,8 +227,8 @@ public class QuadrupleTest {
       Quadruple q1 = Quadruple.fromDouble(d1);
       Quadruple q2 = Quadruple.fromDouble(d2);
 
-      assertEquals(d1, toDouble(q1));
-      assertEquals(d2, toDouble(q2));
+      assertEquals(d1, toDouble(q1), 0.0);
+      assertEquals(d2, toDouble(q2), 0.0);
       assertLessThan(Quadruple.NEGATIVE_INFINITY, q1);
       assertLessThan(Quadruple.NEGATIVE_INFINITY, q2);
       if (d1 < d2) {
@@ -264,7 +264,7 @@ public class QuadrupleTest {
       double d64 = (double) i64; // May be rounded.
       Quadruple q = Quadruple.fromLong(i64);
       if ((long) d64 == i64) {
-        assertEquals(i64, toDouble(q));
+        assertEquals(i64, toDouble(q), 0.0);
       } else {
         assertNotEquals(q, Quadruple.fromDouble(d64));
       }
@@ -363,3 +363,4 @@ public class QuadrupleTest {
         (q.negative() ? 1L << 63 : 0) | ((doubleExponent + 1023L) << 52) | mantissa);
   }
 }
+
