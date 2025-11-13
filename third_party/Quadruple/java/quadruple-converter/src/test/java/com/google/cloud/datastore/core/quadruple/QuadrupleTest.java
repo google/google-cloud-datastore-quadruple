@@ -24,10 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.runner.RunWith;
-import org.junit.jupiter.runners.JUnit4;
 
-@RunWith(JUnit4.class)
 public class QuadrupleTest {
   private static final int QUADRUPLE_BIAS = 0x7fff_ffff;
   private static final Quadruple OTHER_NAN = new Quadruple(true, (int) 0xFFFFFFFFL, 1, 1);
