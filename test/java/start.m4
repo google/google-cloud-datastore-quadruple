@@ -24,8 +24,5 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.runner.RunWith;
-import org.junit.jupiter.runners.JUnit4;
 
-@RunWith(JUnit4.class)
 public class QuadrupleBuilderTest {
