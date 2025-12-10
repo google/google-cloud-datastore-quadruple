@@ -323,14 +323,30 @@ public class QuadrupleTest {
 
   @Test
   public void noadjust() {
-    double asDouble = 3;
-    BigDecimal asBigDecimal = new BigDecimal(asDouble, MathContext.DECIMAL128);
-    assertEquals(asBigDecimal, new BigDecimal(asDouble));
-    System.err.println("p0");
-    assertEquals(Quadruple.fromString(asBigDecimal.toString()), Quadruple.fromDouble(asDouble));
-    assertEquals(
-        Quadruple.fromStringNoDoubleCollisions(asBigDecimal.toString()),
-        Quadruple.fromDouble(asDouble));
+    testNoAdjust(Quadruple.fromDouble(3)); // Canary 1.
+    testNoAdjust(Quadruple.fromDouble(20)); // Canary 2.
+
+    Random random = new Random(2445);
+    for (int i = 0; i < 1000; i++) {
+      // Generate some random doubles between 2^27 and 2^112 - these are always exactly
+      // representable as a Decimal128.
+      long mantissa = random.nextLong() & ((1L << 52) - 1);
+      int exponent = random.nextInt(112 - 27) + 27;
+      boolean negative = random.nextInt(2) == 0;
+      testNoAdjust(new Quadruple(negative, exponent + QUADRUPLE_BIAS, mantissa << 12, 0));
+    }
+  }
+
+  private void testNoAdjust(Quadruple q) {
+    // Check q is a double exactly convertible to Decimal128.
+    double x = toDouble(q);
+    assertEquals(q, Quadruple.fromDouble(x));
+    BigDecimal d = new BigDecimal(x, MathContext.DECIMAL128);
+    assertEquals(d, new BigDecimal(x));
+
+    // Check there's no collision avoidance.
+    assertEquals(Quadruple.fromString(d.toString()), q);
+    assertEquals(Quadruple.fromStringNoDoubleCollisions(d.toString()), q);
   }
 
   @Test
