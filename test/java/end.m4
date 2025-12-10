@@ -9,5 +9,11 @@
     assertEquals(mantHi, quadruple.mantHi);
     assertEquals(mantLo, quadruple.mantLo);
     assertEquals(exponent, Integer.toUnsignedLong(quadruple.exponent));
+
+    // avoidDecimal128CollisionsWithDouble doesn't change any of the test results.
+    quadruple.avoidDecimal128CollisionsWithDouble();
+    assertEquals(mantHi, quadruple.mantHi);
+    assertEquals(mantLo, quadruple.mantLo);
+    assertEquals(exponent, Integer.toUnsignedLong(quadruple.exponent));
   }
 }

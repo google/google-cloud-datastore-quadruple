@@ -67,20 +67,7 @@ public class QuadrupleBuilder {
   }
 
   public void avoidDecimal128CollisionsWithDouble() {
-    // If the lowest 76 bits of the QuadrupleBuilder are zero, then the Decimal128 number M which
-    // was converted to QuadrupleBuilder via parseDecimal has the same QuadrupleBuilder representation
-    // as some double D. Either:
-    // - M and D are the same number - the conversion is exact, so rounding = 0
-    // - M and D are different numbers - the conversion is inexact, and rounding != 0 (we verified
-    //   there are no such cases with M!=D and rounding=0)
-
-    // Therefore, we can avoid the collision in Quadruple values by switching to round to the other
-    // closest Quadruple. This restores the correct relative order of M and D, and creates no
-    // collisions with other Decimal128 values, as consecutive Decimal128 values are approximately
-    // 340000 Quadruple-lsbs apart.
-    if (mantLo == 0 && (mantHi & 0xfff) == 0) {
-      invertRounding();
-    }
+    doAvoidDecimal128CollisionsWithDouble();
   }
 
   # The fields containing the value of the instance

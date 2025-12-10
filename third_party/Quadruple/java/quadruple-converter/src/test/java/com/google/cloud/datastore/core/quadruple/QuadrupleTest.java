@@ -322,6 +322,18 @@ public class QuadrupleTest {
   }
 
   @Test
+  public void noadjust() {
+    double asDouble = 3;
+    BigDecimal asBigDecimal = new BigDecimal(asDouble, MathContext.DECIMAL128);
+    assertEquals(asBigDecimal, new BigDecimal(asDouble));
+    System.err.println("p0");
+    assertEquals(Quadruple.fromString(asBigDecimal.toString()), Quadruple.fromDouble(asDouble));
+    assertEquals(
+        Quadruple.fromStringNoDoubleCollisions(asBigDecimal.toString()),
+        Quadruple.fromDouble(asDouble));
+  }
+
+  @Test
   public void adjust() {
     // Decimal128 numbers (34-digit, IEEE decimal floating point standard) that round up or down to
     // a Quadruple with 75 trailing zero bits would be incorrectly considered equal to the

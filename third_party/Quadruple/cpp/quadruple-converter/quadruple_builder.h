@@ -45,6 +45,7 @@ private:
     std::array<uint64_t, 6> buffer6x32C;
     std::array<uint64_t, 12> buffer12x32;
   void parse(std::vector<uint8_t>& digits,int32_t exp10);
+  void doAvoidDecimal128CollisionsWithDouble();
   void invertRounding();
   int32_t parseMantissa(std::vector<uint8_t>& digits,std::array<uint64_t,6>& mantissa);
   template<std::size_t N> void divBuffBy10(std::array<uint64_t,N>& buffer);

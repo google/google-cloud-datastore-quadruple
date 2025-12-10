@@ -44,8 +44,8 @@ class QuadrupleBuilder(object):
   # (2^63) / 10 =~ 9.223372e17
   TWO_POW_63_DIV_10 = 922337203685477580.0
 
-  # Just for convenience: 0x8000_0000_0000_0000L
-  HIGH_BIT = 0x8000_0000_0000_0000
+  # An over-estimate of the maximum error during conversion
+  MAX_ERROR = 256
 
   # Just for convenience: 0x8000_0000L, 2^31
   POW_2_31 = 2147483648.0
@@ -314,28 +314,42 @@ class QuadrupleBuilder(object):
     self.findBinaryMantissa(exp10, exp2, mantissa);
   
 
-  # Flip the result of parse to round to the other closest 128-bit Quadruple
+  # There are doubles D and Decimal128 numbers M with M != D that have the same Quadruple
+  # representation (example: D = 0.5 + 15877 * 2^-53, M = Decimal128.fromDouble(D)). To
+  # allow correct comparison results of doubles and Decimal128 using Quadruple, this
+  # function will increase or decrease the lsb of the result of Quadruple(M) to restore the
+  # correct order of comparisons with D when such collisions occur.
+  def doAvoidDecimal128CollisionsWithDouble(self, ):
+    # Collisions may occur when the result matches some double.
+    if self.mantLo == 0 and (self.mantHi & 0XFFF) == 0:
+      # The 'rounding' field tracks whether the conversion was exact within MAX_ERROR lsbs of the
+      # intermediate 192-bit result, and if not exact, which direction the rounding occurred in. For
+      # inexact results, we 'invert' the rounding by incrementing or decrementing the Quadruple's
+      # lsb, which restores the correct order. This cannot produce a collision with some other
+      # Decimal128 as consecutive Decimal128 values are approximately 340000 Quadruple-lsbs apart.
+      #
+      # Because the conversion is only exact within MAX_ERROR, we could potentially incorrectly
+      # assume the conversion is exact if there are D != M such that the 192-bit binary
+      # floating-point representation of M is within MAX_ERROR lsbs of the 192-bit binary
+      # floating-point representation of D. There are however no such D, M pairs. The closest
+      # pair is D = 2^-131 * (1 + 2002631181011870 * 2^-52), M = Decimal128.fromDouble(D) whose
+      # distance is ~878841 192-bit lsbs, much greater than MAX_ERROR=256
+      self.invertRounding();
+    
+  
+
+  # Flip the result of parse to round to the other closest 128-bit Quadruple - assumes mantLo == 0.
   def invertRounding(self, ):
     if self.rounding != 0:
       if self.rounding > 0:
-        self.mantLo += 1;
-        if self.mantLo == 0:
-          self.mantHi += 1;
-          if self.mantHi == 0:
-            self.exponent += 1;
-          
-        
+        self.mantLo = 1;
       else:
-        if self.mantLo == 0:
-          self.mantLo = 0xFFFF_FFFF_FFFF_FFFF;
-          if self.mantHi == 0:
-            self.exponent -= 1;
-            self.mantHi = 0xFFFF_FFFF_FFFF_FFFF;
-          else:
-            self.mantHi -= 1;
-          
+        self.mantLo = 0xFFFF_FFFF_FFFF_FFFF;
+        if self.mantHi == 0:
+          self.exponent -= 1;
+          self.mantHi = 0xFFFF_FFFF_FFFF_FFFF;
         else:
-          self.mantLo -= 1;
+          self.mantHi -= 1;
         
       
     
@@ -467,8 +481,22 @@ class QuadrupleBuilder(object):
     if exp2 <= 0:
       return;
     
-    # true if bits 128-191 are all 0, i.e., the conversion appears exact to 192-bit precision
-    exact192 = product[4] == 0 and product[5] == 0;
+
+    # due to the limited precision of the power of 2, a number with exactly half LSB in its mantissa
+    # (i.e that would have 0x8000_0000_0000_0000L in bits 128..191 if it were computed precisely),
+    # after multiplication by this power of 2, may get erroneous bits 185..191 (counting from the
+    # MSB), taking a value from
+    #    0xXXXX_XXXX_XXXX_XXXXL 0xXXXX_XXXX_XXXX_XXXXL 0x7FFF_FFFF_FFFF_FFD8L.
+    # to 0xXXXX_XXXX_XXXX_XXXXL 0xXXXX_XXXX_XXXX_XXXXL 0x8000_0000_0000_0014L, or something alike.
+    # To round it up, we first add
+    # 0x0000_0000_0000_0000L 0x0000_0000_0000_0000L 0x0000_0000_0000_0028L, to turn it into
+    # 0xXXXX_XXXX_XXXX_XXXXL 0xXXXX_XXXX_XXXX_XXXXL 0x8000_0000_0000_00XXL,
+    # and then add
+    # 0x0000_0000_0000_0000L 0x0000_0000_0000_0000L 0x8000_0000_0000_0000L, to provide carry to
+    # higher bits.
+    self.addToBuff(product, 5, self.MAX_ERROR); # to compensate possible inaccuracy
+    # true if bits 128-191 are within 2 * MAX_ERROR, i.e., the conversion appears exact
+    exact192 = product[4] == 0 and product[5] >= 0 and product[5] <= 2 * self.MAX_ERROR;
     prev128 = product[3];
     exp2 += self.roundUp(product); # round up, may require exponent correction
 
@@ -693,23 +721,6 @@ class QuadrupleBuilder(object):
   # @param mantissa the buffer to get rounded
   # @return 1 if the buffer was shifted, 0 otherwise
   def roundUp(self, mantissa):
-    # due to the limited precision of the power of 2, a number with exactly half LSB in its
-    # mantissa
-    # (i.e that would have 0x8000_0000_0000_0000L in bits 128..191 if it were computed precisely),
-    # after multiplication by this power of 2, may get erroneous bits 185..191 (counting from the
-    # MSB),
-    # taking a value from
-    # 0xXXXX_XXXX_XXXX_XXXXL 0xXXXX_XXXX_XXXX_XXXXL 0x7FFF_FFFF_FFFF_FFD8L.
-    # to
-    # 0xXXXX_XXXX_XXXX_XXXXL 0xXXXX_XXXX_XXXX_XXXXL 0x8000_0000_0000_0014L, or something alike.
-    # To round it up, we first add
-    # 0x0000_0000_0000_0000L 0x0000_0000_0000_0000L 0x0000_0000_0000_0028L, to turn it into
-    # 0xXXXX_XXXX_XXXX_XXXXL 0xXXXX_XXXX_XXXX_XXXXL 0x8000_0000_0000_00XXL,
-    # and then add
-    # 0x0000_0000_0000_0000L 0x0000_0000_0000_0000L 0x8000_0000_0000_0000L, to provide carry to
-    # higher bits.
-
-    self.addToBuff(mantissa, 5, 100); # to compensate possible inaccuracy
     self.addToBuff(mantissa, 4, 0x8000_0000); # round-up, if bits 128..159 >= 0x8000_0000L
     if (mantissa[0] & (self.HIGHER_32_BITS << 1)) != 0:
       # carry's got propagated beyond the highest bit
