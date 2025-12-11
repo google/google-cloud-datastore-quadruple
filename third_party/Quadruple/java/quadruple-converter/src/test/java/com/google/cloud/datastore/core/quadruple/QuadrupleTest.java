@@ -20,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -319,6 +321,88 @@ public class QuadrupleTest {
     assertEquals(Quadruple.fromDouble(100), Quadruple.fromString("1000000000000e-10"));
   }
 
+  @Test
+  public void noadjust() {
+    testNoAdjust(Quadruple.fromDouble(3)); // Canary 1.
+    testNoAdjust(Quadruple.fromDouble(20)); // Canary 2.
+
+    Random random = new Random(2445);
+    for (int i = 0; i < 1000; i++) {
+      // Generate some random doubles between 2^27 and 2^112 - these are always exactly
+      // representable as a Decimal128.
+      long mantissa = random.nextLong() & ((1L << 52) - 1);
+      int exponent = random.nextInt(112 - 27) + 27;
+      boolean negative = random.nextInt(2) == 0;
+      testNoAdjust(new Quadruple(negative, exponent + QUADRUPLE_BIAS, mantissa << 12, 0));
+    }
+  }
+
+  private void testNoAdjust(Quadruple q) {
+    // Check q is a double exactly convertible to Decimal128.
+    double x = toDouble(q);
+    assertEquals(q, Quadruple.fromDouble(x));
+    BigDecimal d = new BigDecimal(x, MathContext.DECIMAL128);
+    assertEquals(d, new BigDecimal(x));
+
+    // Check there's no collision avoidance.
+    assertEquals(Quadruple.fromString(d.toString()), q);
+    assertEquals(Quadruple.fromStringNoDoubleCollisions(d.toString()), q);
+  }
+
+  @Test
+  public void adjust() {
+    // Decimal128 numbers (34-digit, IEEE decimal floating point standard) that round up or down to
+    // a Quadruple with 75 trailing zero bits would be incorrectly considered equal to the
+    // corresponding double. We detect this and increase or decrease the 128-bit mantissa by 1 to
+    // compensate.
+
+    // An (exact) double without an exact Decimal128 representation.
+    double roundsUp = 0.5 + Math.scalb((double) 0b0011_1110_0000_0101, -53);
+    BigDecimal roundedUp = new BigDecimal(roundsUp, MathContext.DECIMAL128);
+    // The decimal version is an approximation:
+    assertGreaterThan(roundedUp, new BigDecimal(roundsUp));
+    // But the 128-bit binary mantissa approximation of roundedUp is identical to roundsUp's
+    assertEquals(Quadruple.fromString(roundedUp.toString()), Quadruple.fromDouble(roundsUp));
+    // ... but asQuadruple() restores the expected order (including for the complement).
+    assertGreaterThan(
+        Quadruple.fromStringNoDoubleCollisions(roundedUp.toString()),
+        Quadruple.fromDouble(roundsUp));
+    assertLessThan(
+        Quadruple.fromStringNoDoubleCollisions("-" + roundedUp.toString()),
+        Quadruple.fromDouble(-roundsUp));
+
+    // Another (exact) double without an exact Decimal128 representation.
+    double roundsDown = 0.5 + Math.scalb((double) 0b0010_1000_0001_0101_0010, -53);
+    BigDecimal roundedDown = new BigDecimal(roundsDown, MathContext.DECIMAL128);
+    // The decimal128 version is an approximation:
+    assertLessThan(roundedDown, new BigDecimal(roundsDown));
+    // But the 128-bit binary mantissa approximation of roundedDown is identical to roundsDown's
+    assertEquals(Quadruple.fromString(roundedDown.toString()), Quadruple.fromDouble(roundsDown));
+    // ... but asQuadruple() restores the expected order (including for the complement).
+    assertLessThan(
+        Quadruple.fromStringNoDoubleCollisions(roundedDown.toString()),
+        Quadruple.fromDouble(roundsDown));
+    assertGreaterThan(
+        Quadruple.fromStringNoDoubleCollisions("-" + roundedDown.toString()),
+        Quadruple.fromDouble(-roundsDown));
+
+    // A very large (integral) double without an exact Decimal128 representation.
+    double largeDouble = Math.scalb(1.0, 137) + Math.scalb((double) 0x7be46d5e42994L, 137 - 52);
+    BigDecimal roundedDecimal = new BigDecimal(largeDouble, MathContext.DECIMAL128);
+    // The decimal version is an approximation (rounded down):
+    assertLessThan(roundedDecimal, new BigDecimal(largeDouble));
+    // But the 128-bit binary mantissa approximation of roundedDecimal is identical to largeDouble's
+    assertEquals(
+        Quadruple.fromString(roundedDecimal.toString()), Quadruple.fromDouble(largeDouble));
+    // ... but asQuadruple() restores the expected order (including for the complement).
+    assertLessThan(
+        Quadruple.fromStringNoDoubleCollisions(roundedDecimal.toString()),
+        Quadruple.fromDouble(largeDouble));
+    assertGreaterThan(
+        Quadruple.fromStringNoDoubleCollisions("-" + roundedDecimal.toString()),
+        Quadruple.fromDouble(-largeDouble));
+  }
+
   private static long nextRandomLong(Random random) {
     int bits = random.nextInt(64) + 1;
     long i64 = random.nextLong();
@@ -329,8 +413,12 @@ public class QuadrupleTest {
     return i64 - (1L << (bits - 1));
   }
 
-  private void assertLessThan(Quadruple q1, Quadruple q2) {
-    assertTrue(q1.compareTo(q2) < 0);
+  private <T extends Comparable<T>> void assertLessThan(T q1, T q2) {
+    assertTrue(q1.compareTo(q2) < 0, String.format("%s < %s", q1, q2));
+  }
+
+  private <T extends Comparable<T>> void assertGreaterThan(T q1, T q2) {
+    assertTrue(q1.compareTo(q2) > 0, String.format("%s > %s", q1, q2));
   }
 
   private double toDouble(Quadruple q) {

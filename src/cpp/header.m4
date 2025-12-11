@@ -38,5 +38,6 @@ public:
   uint32_t exponent;
   uint64_t mantHi;
   uint64_t mantLo;
+  int32_t rounding;
 
 private:

@@ -39,6 +39,7 @@ define(c_if, `if ($1) {')dnl
 define(c_else, `} else {')dnl
 define(c_elsif, `} else if ($1) {')dnl
 define(c_and, `&&')dnl
+define(c_not, `!($1)')dnl
 define(c_while, `while ($1) {')dnl
 define(c_for_range, `for (let $1 = ($2); $1 < ($3); $1++) {')dnl
 define(c_for_range_down, `for (let $1 = ($2) - 1; $1 >= ($3); $1--) {')dnl
@@ -69,3 +70,4 @@ export class QuadrupleBuilder {
   exponent: number = 0;
   mantHi: bigint = 0n;
   mantLo: bigint = 0n;
+  rounding: number = 0;

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
 public class QuadrupleBuilderTest {
+
   @Test
   public void edge() {
     // Infinity.
@@ -12167,6 +12168,12 @@ public class QuadrupleBuilderTest {
     }
 
     var quadruple = QuadrupleBuilder.parseDecimal(digits, exp10);
+    assertEquals(mantHi, quadruple.mantHi);
+    assertEquals(mantLo, quadruple.mantLo);
+    assertEquals(exponent, Integer.toUnsignedLong(quadruple.exponent));
+
+    // avoidDecimal128CollisionsWithDouble doesn't change any of the test results.
+    quadruple.avoidDecimal128CollisionsWithDouble();
     assertEquals(mantHi, quadruple.mantHi);
     assertEquals(mantLo, quadruple.mantLo);
     assertEquals(exponent, Integer.toUnsignedLong(quadruple.exponent));

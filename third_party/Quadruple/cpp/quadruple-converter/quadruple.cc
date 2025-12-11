@@ -31,8 +31,8 @@ constexpr int64_t kHashCodeOfNan = 7652541255;
 }
 
 Quadruple::Quadruple(double x) {
-  negative_ = signbit(x);
-  switch (fpclassify(x)) {
+  negative_ = std::signbit(x);
+  switch (std::fpclassify(x)) {
     case FP_NAN:
       negative_ = false;
       exponent_ = kInfiniteExponent;
@@ -249,4 +249,3 @@ int64_t Quadruple::HashValue() const {
 }
 
 }  // namespace cloud_datastore
-

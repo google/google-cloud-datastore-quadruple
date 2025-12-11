@@ -18,7 +18,8 @@ define(null, None)dnl
 define(def_init, {def __init__(self):
     self.exponent = 0
     self.mantHi = 0
-    self.mantLo = 0})dnl
+    self.mantLo = 0
+    self.rounding = 0})dnl
 define(def_fn, {def $2(self, shift(shift($@))):})dnl
 define(def_array_fn, {def $3(self, shift(shift(shift($@)))):})dnl
 define(array_size, {})dnl
@@ -48,6 +49,7 @@ define(c_if, {if $1:})dnl
 define(c_else, {else:})dnl
 define(c_elsif, {elif $1:})dnl
 define(c_and, {and})dnl
+define(c_not, {not ($1)})dnl
 define(c_while, {while $1:})dnl
 define(c_for_range, {for $1 in range($2, $3):})dnl
 define(c_for_range_down, {for $1 in range(($2) - 1, ($3) - 1, -1):})dnl

@@ -31,6 +31,7 @@ export class QuadrupleBuilder {
   exponent: number = 0;
   mantHi: bigint = 0n;
   mantLo: bigint = 0n;
+  rounding: number = 0;
 
 
   // 2^192 = 6.277e57, so the 58-th digit after point may affect the result
@@ -45,8 +46,8 @@ export class QuadrupleBuilder {
   // (2^63) / 10 =~ 9.223372e17
   static TWO_POW_63_DIV_10 = 922337203685477580.0;
 
-  // Just for convenience: 0x8000_0000_0000_0000L
-  static HIGH_BIT = 0x8000_0000_0000_0000n;
+  // An over-estimate of the maximum error during conversion
+  static MAX_ERROR = 256n;
 
   // Just for convenience: 0x8000_0000L, 2^31
   static POW_2_31 = 2147483648.0;
@@ -283,6 +284,7 @@ export class QuadrupleBuilder {
     this.exponent = 0;
     this.mantHi = 0n;
     this.mantLo = 0n;
+    this.rounding = 0;
 
     // Finds numeric value of the decimal mantissa
     let mantissa: bigint[] = this.buffer6x32C;
@@ -308,6 +310,47 @@ export class QuadrupleBuilder {
     let exp2: number = this.findBinaryExponent(exp10, mantissa);
     // Finds binary mantissa and possible exponent correction. Fills the fields.
     this.findBinaryMantissa(exp10, exp2, mantissa);
+  }
+
+  // There are doubles D and Decimal128 numbers M with M != D that have the same Quadruple
+  // representation (example: D = 0.5 + 15877 * 2^-53, M = Decimal128.fromDouble(D)). To
+  // allow correct comparison results of doubles and Decimal128 using Quadruple, this
+  // function will increase or decrease the lsb of the result of Quadruple(M) to restore the
+  // correct order of comparisons with D when such collisions occur.
+  doAvoidDecimal128CollisionsWithDouble() : void {
+    // Collisions may occur when the result matches some double.
+    if (this.mantLo == 0n && (this.mantHi & 0XFFFn) == 0n) {
+      // The 'rounding' field tracks whether the conversion was exact within MAX_ERROR lsbs of the
+      // intermediate 192-bit result, and if not exact, which direction the rounding occurred in. For
+      // inexact results, we 'invert' the rounding by incrementing or decrementing the Quadruple's
+      // lsb, which restores the correct order. This cannot produce a collision with some other
+      // Decimal128 as consecutive Decimal128 values are approximately 340000 Quadruple-lsbs apart.
+      //
+      // Because the conversion is only exact within MAX_ERROR, we could potentially incorrectly
+      // assume the conversion is exact if there are D != M such that the 192-bit binary
+      // floating-point representation of M is within MAX_ERROR lsbs of the 192-bit binary
+      // floating-point representation of D. There are however no such D, M pairs. The closest
+      // pair is D = 2^-131 * (1 + 2002631181011870 * 2^-52), M = Decimal128.fromDouble(D) whose
+      // distance is ~878841 192-bit lsbs, much greater than MAX_ERROR=256
+      this.invertRounding();
+    }
+  }
+
+  // Flip the result of parse to round to the other closest 128-bit Quadruple - assumes mantLo == 0.
+  invertRounding() : void {
+    if (this.rounding != 0) {
+      if (this.rounding > 0) {
+        this.mantLo = 1n;
+      } else {
+        this.mantLo = 0xFFFF_FFFF_FFFF_FFFFn;
+        if (this.mantHi == 0n) {
+          this.exponent -= 1;
+          this.mantHi = 0xFFFF_FFFF_FFFF_FFFFn;
+        } else {
+          this.mantHi -= 1n;
+        }
+      }
+    }
   }
 
   parseMantissa(digits: number[],mantissa: bigint[]) : number {
@@ -436,6 +479,23 @@ export class QuadrupleBuilder {
     if (exp2 <= 0) {
       return;
     }
+
+    // due to the limited precision of the power of 2, a number with exactly half LSB in its mantissa
+    // (i.e that would have 0x8000_0000_0000_0000L in bits 128..191 if it were computed precisely),
+    // after multiplication by this power of 2, may get erroneous bits 185..191 (counting from the
+    // MSB), taking a value from
+    //    0xXXXX_XXXX_XXXX_XXXXL 0xXXXX_XXXX_XXXX_XXXXL 0x7FFF_FFFF_FFFF_FFD8L.
+    // to 0xXXXX_XXXX_XXXX_XXXXL 0xXXXX_XXXX_XXXX_XXXXL 0x8000_0000_0000_0014L, or something alike.
+    // To round it up, we first add
+    // 0x0000_0000_0000_0000L 0x0000_0000_0000_0000L 0x0000_0000_0000_0028L, to turn it into
+    // 0xXXXX_XXXX_XXXX_XXXXL 0xXXXX_XXXX_XXXX_XXXXL 0x8000_0000_0000_00XXL,
+    // and then add
+    // 0x0000_0000_0000_0000L 0x0000_0000_0000_0000L 0x8000_0000_0000_0000L, to provide carry to
+    // higher bits.
+    this.addToBuff(product, 5, QuadrupleBuilder.MAX_ERROR); // to compensate possible inaccuracy
+    // true if bits 128-191 are within 2 * MAX_ERROR, i.e., the conversion appears exact
+    let exact192: boolean = product[4] == 0n && product[5] >= 0n && product[5] <= 2n * QuadrupleBuilder.MAX_ERROR;
+    let prev128: bigint = product[3];
     exp2 += this.roundUp(product); // round up, may require exponent correction
 
     if (BigInt(exp2) >= QuadrupleBuilder.EXPONENT_OF_INFINITY) {
@@ -444,6 +504,16 @@ export class QuadrupleBuilder {
       this.exponent = Number(exp2);
       this.mantHi = (((product[0] << 32n) + product[1]) & 0xffffffffffffffffn);
       this.mantLo = (((product[2] << 32n) + product[3]) & 0xffffffffffffffffn);
+      // Report in rounding field the direction of the rounding that occured from 192 down to 128 bits
+      if (!(exact192)) {
+        if (product[3] == prev128) {
+          // We truncated the high bits - real value is greater than the rounded value
+          this.rounding = 1;
+        } else {
+          // We added 1 lsb - real value is lower than the rounded value
+          this.rounding = -1;
+        }
+      }
     }
   }
 
@@ -649,23 +719,6 @@ export class QuadrupleBuilder {
   // @param mantissa the buffer to get rounded
   // @return 1 if the buffer was shifted, 0 otherwise
   roundUp(mantissa: bigint[]) : number {
-    // due to the limited precision of the power of 2, a number with exactly half LSB in its
-    // mantissa
-    // (i.e that would have 0x8000_0000_0000_0000L in bits 128..191 if it were computed precisely),
-    // after multiplication by this power of 2, may get erroneous bits 185..191 (counting from the
-    // MSB),
-    // taking a value from
-    // 0xXXXX_XXXX_XXXX_XXXXL 0xXXXX_XXXX_XXXX_XXXXL 0x7FFF_FFFF_FFFF_FFD8L.
-    // to
-    // 0xXXXX_XXXX_XXXX_XXXXL 0xXXXX_XXXX_XXXX_XXXXL 0x8000_0000_0000_0014L, or something alike.
-    // To round it up, we first add
-    // 0x0000_0000_0000_0000L 0x0000_0000_0000_0000L 0x0000_0000_0000_0028L, to turn it into
-    // 0xXXXX_XXXX_XXXX_XXXXL 0xXXXX_XXXX_XXXX_XXXXL 0x8000_0000_0000_00XXL,
-    // and then add
-    // 0x0000_0000_0000_0000L 0x0000_0000_0000_0000L 0x8000_0000_0000_0000L, to provide carry to
-    // higher bits.
-
-    this.addToBuff(mantissa, 5, 100n); // to compensate possible inaccuracy
     this.addToBuff(mantissa, 4, 0x8000_0000n); // round-up, if bits 128..159 >= 0x8000_0000L
     if ((mantissa[0] & (QuadrupleBuilder.HIGHER_32_BITS << 1n)) != 0n) {
       // carry's got propagated beyond the highest bit

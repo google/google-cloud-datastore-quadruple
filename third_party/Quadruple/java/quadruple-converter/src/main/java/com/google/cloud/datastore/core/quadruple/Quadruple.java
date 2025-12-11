@@ -238,6 +238,14 @@ public final class Quadruple implements Comparable<Quadruple> {
    * </ul>
    */
   public static Quadruple fromString(String s) {
+    return fromString(s, false);
+  }
+
+  public static Quadruple fromStringNoDoubleCollisions(String s) {
+    return fromString(s, true);
+  }
+
+  private static Quadruple fromString(String s, boolean avoidDoubleCollisions) {
     if (s.equals("NaN")) {
       return NaN;
     }
@@ -302,10 +310,17 @@ public final class Quadruple implements Comparable<Quadruple> {
     byte[] digitsCopy = new byte[j];
     System.arraycopy(digits, 0, digitsCopy, 0, j);
     QuadrupleBuilder parsed = QuadrupleBuilder.parseDecimal(digitsCopy, exponent);
+    if (avoidDoubleCollisions) {
+      parsed.avoidDecimal128CollisionsWithDouble();
+    }
     return new Quadruple(negative, parsed.exponent, parsed.mantHi, parsed.mantLo);
   }
 
   private static final int bias(int exponent) {
     return exponent + QuadrupleBuilder.EXPONENT_BIAS;
+  }
+
+  public String toString() {
+    return String.format("%s %016x %016x e%d", negative ? "-" : "", mantHi, mantLo, exponent());
   }
 }
