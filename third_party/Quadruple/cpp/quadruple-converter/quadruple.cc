@@ -242,13 +242,13 @@ int64_t Quadruple::HashValue() const {
   if (is_nan()) {
     return kHashCodeOfNan;
   }
-  const int64_t prime = 31;
-  int64_t result = 1;
+  const uint64_t prime = 31; // use unsigned
+  uint64_t result = 1; // use unsigned
   result = prime * result + static_cast<uint64_t>(exponent_);
   result = prime * result + static_cast<uint64_t>(mantissa_hi_);
   result = prime * result + static_cast<uint64_t>(mantissa_lo_);
   result = prime * result + (negative_ ? 1231 : 1237);
-  return result;
+  return static_cast<int64_t>(result); // cast back to signed at the end
 }
 
 }  // namespace cloud_datastore
